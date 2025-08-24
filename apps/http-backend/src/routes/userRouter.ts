@@ -137,7 +137,7 @@ try {
 
 router.get("/chats/:roomId",async (req,res)=>{
     const roomId=Number(req.params.roomId);
-    console.log(roomId);
+    console.log("heloooooooooooooooooooo",roomId);
     try {
         const messages=await prisma.chat.findMany({
             where:{
@@ -148,7 +148,7 @@ router.get("/chats/:roomId",async (req,res)=>{
             },
             take:50
         });
-        res.status(201).json({
+        res.status(200).json({
             messages
         });
     } catch (error) {
