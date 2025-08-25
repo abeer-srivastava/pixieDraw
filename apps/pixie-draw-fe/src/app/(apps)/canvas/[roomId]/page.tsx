@@ -1,8 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DrawAPI, initDraw, sendShapes } from "../../draw";
+import { DrawAPI, initDraw } from "../../draw";
 import { ArrowBigRight, ArrowBigRightDash, Circle, Eraser, Pencil, RectangleHorizontal, Trash, Triangle } from "lucide-react";
 import { useParams } from "next/navigation";
+import { WS_URL } from "../../../../../config";
 
 type Tool = "" | "pen" | "rect" | "circle" | "eraser" | "arrow" | "dottedArrow" | "triangle";
 
@@ -15,8 +16,28 @@ function Canvas() {
   const [lineWidth, setLineWidth] = useState(2);
   const param=useParams();
   const roomId=String(param.roomId);
+  const [socket,setSocket]=useState<WebSocket|null>(null);
+
   // Handle window resize with debouncing
   useEffect(() => {
+    const token=localStorage.getItem("token");
+    console.log("token in effect ")
+    console.log(token ,typeof token);
+    if(!token){
+        console.log("token not found",token)
+        return;
+    }
+    const ws = new WebSocket(`${WS_URL}?token=${token}`);
+    ws.onopen=()=>{
+        setSocket(ws);
+        console.log("ws connected",ws);
+        const data=JSON.stringify({
+            type:"join_room",
+            roomId
+        });
+        console.log(typeof data,data);
+        ws.send(data);
+    }
 
     const updateSize = () => {
       setSize({ width: window.innerWidth, height: window.innerHeight });
@@ -40,11 +61,12 @@ function Canvas() {
     };
   }, []);
 
+
   // Initialize draw API only once when canvas is ready or size changes
   useEffect(() => {
     if (canvasRef.current) {
     if (drawAPI) {
-      sendShapes(drawAPI, roomId); 
+    //   sendShapes(drawAPI, roomId); 
       drawAPI.destroy();           
     }
       // Save current canvas content before re-initialization
@@ -55,11 +77,15 @@ function Canvas() {
           imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
       }
+        if(!socket){
+        console.log("socket not found");
+        return;
+      }
 
-      const api = initDraw(canvasRef.current, {
+      const api = initDraw(canvasRef.current, socket,{
         defaultTool: tool,
         defaultColor: color,
-        defaultLineWidth: lineWidth,
+        defaultLineWidth: lineWidth,//socket
       });
       setDrawAPI(api);
 
@@ -81,7 +107,7 @@ function Canvas() {
         }
       }
     }
-  }, [size,color,lineWidth,tool]);
+  }, [size,color,lineWidth,tool,socket]);
 
   // Update tool when it changes
   useEffect(() => {

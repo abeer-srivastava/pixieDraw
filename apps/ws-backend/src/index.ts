@@ -17,12 +17,17 @@ const wss=new WebSocketServer({port:8000},()=>{
 const users:User[]=[];
 
 function checkUser(token:string):string|null{
-    const decodedToken=jwt.verify(token,JWT_SECRET);
-    if(!decodedToken){
-        console.log("user not authenticated for ws")
+    try {
+        const decodedToken=jwt.verify(token,JWT_SECRET);
+        if(!decodedToken){
+            console.log("user not authenticated for ws")
+            return null;
+        }
+        return (decodedToken as jwt.JwtPayload).userId
+    } catch (error) {
+        console.log("token not found in the ws server ");
         return null;
     }
-    return (decodedToken as jwt.JwtPayload).userId
 }
 
 wss.on("connection",function connection(ws,request){
@@ -50,7 +55,7 @@ wss.on("connection",function connection(ws,request){
         }else{
             parsedData=JSON.parse(data);
         }
-        
+
         if(parsedData.type==="join_room"){
             const user=users.find(x=>x.ws===ws)
             user?.rooms.push(parsedData.roomId);

@@ -41,6 +41,7 @@ export default function AuthPage({ isSignIn }: AuthPageProps) {
         throw new Error("Error Occured during Signin")
       }
       const data = await res.data.token
+      localStorage.setItem("token",data);
       console.log("✅ Auth success:", data)
       }
       else{
