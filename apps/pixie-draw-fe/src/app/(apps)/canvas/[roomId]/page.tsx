@@ -1,7 +1,10 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawAPI, initDraw } from "../../draw";
-import { ArrowBigRight, ArrowBigRightDash, Circle, Eraser, Pencil, RectangleHorizontal, Trash, Triangle } from "lucide-react";
+import { 
+  ArrowBigRight, ArrowBigRightDash, Circle, Eraser, 
+  Pencil, RectangleHorizontal, Trash, Triangle 
+} from "lucide-react";
 import { useParams } from "next/navigation";
 import { WS_URL } from "../../../../../config";
 
@@ -11,33 +14,39 @@ function Canvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawAPI, setDrawAPI] = useState<DrawAPI | null>(null);
   const [size, setSize] = useState({ width: 1000, height: 600 });
-  const [tool, setTool] = useState<Tool>("pen"); // Start with valid tool
+  const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState("#a78bfa");
   const [lineWidth, setLineWidth] = useState(2);
-  const param=useParams();
-  const roomId=String(param.roomId);
-  const [socket,setSocket]=useState<WebSocket|null>(null);
+  const param = useParams();
+  const roomId = String(param.roomId);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
 
-  // Handle window resize with debouncing
+  // Handle window resize & WebSocket connection
   useEffect(() => {
-    const token=localStorage.getItem("token");
-    console.log("token in effect ")
-    console.log(token ,typeof token);
-    if(!token){
-        console.log("token not found",token)
-        return;
+    const token = localStorage.getItem("token");
+    // console.log("token in effect", token, typeof token);
+
+    if (!token) {
+      console.log("token not found", token);
+      return;
     }
+
     const ws = new WebSocket(`${WS_URL}?token=${token}`);
-    ws.onopen=()=>{
-        setSocket(ws);
-        console.log("ws connected",ws);
-        const data=JSON.stringify({
-            type:"join_room",
-            roomId
-        });
-        console.log(typeof data,data);
-        ws.send(data);
-    }
+
+    ws.onopen = () => {
+      console.log("ws connected", ws); // ✅ log ws, not stale socket
+      const data = JSON.stringify({
+        type: "join_room",
+        roomId,
+      });
+      ws.send(data);
+      console.log("sendingdata",data);
+      setSocket(ws);
+
+    };
+
+    ws.onerror = (err) => console.error("WS error", err);
+    ws.onclose = () => console.log("WS closed");
 
     const updateSize = () => {
       setSize({ width: window.innerWidth, height: window.innerHeight });
@@ -48,86 +57,82 @@ function Canvas() {
 
     let timeoutId: NodeJS.Timeout;
     const handleResize = () => {
-      // Debounce resize to avoid too many re-initializations
       clearTimeout(timeoutId);
       timeoutId = setTimeout(updateSize, 100);
     };
-    
+
     window.addEventListener("resize", handleResize);
-    
+
     return () => {
       window.removeEventListener("resize", handleResize);
       clearTimeout(timeoutId);
+      ws.close(); // ✅ cleanup socket
     };
-  }, []);
+  }, [roomId]);
 
-
-  // Initialize draw API only once when canvas is ready or size changes
+  // Initialize draw API when canvas ready or socket available
   useEffect(() => {
-    if (canvasRef.current) {
+    if (!canvasRef.current) return;
+
     if (drawAPI) {
-    //   sendShapes(drawAPI, roomId); 
-      drawAPI.destroy();           
+      drawAPI.destroy();
     }
-      // Save current canvas content before re-initialization
-      let imageData: ImageData | null = null;
-      if (drawAPI && canvasRef.current) {
-        const ctx = canvasRef.current.getContext('2d');
+
+    // Save current canvas content before re-initialization
+    let imageData: ImageData | null = null;
+    if (drawAPI && canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      if (ctx) {
+        imageData = ctx.getImageData(
+          0,
+          0,
+          canvasRef.current.width,
+          canvasRef.current.height
+        );
+      }
+    }
+
+    console.log("socket in 2nd useEffect", socket);
+    if (!socket) {
+      console.log("socket not found");
+      return;
+    }
+
+    const api = initDraw(canvasRef.current, socket,Number(roomId),{
+      defaultTool: tool,
+      defaultColor: color,
+      defaultLineWidth: lineWidth,
+    });
+    setDrawAPI(api);
+
+    if (api) {
+      api.setTool(tool);
+      api.setColor(color);
+      api.setLineWidth(lineWidth);
+
+      // Restore previous drawing if it existed
+      if (imageData && canvasRef.current) {
+        const ctx = canvasRef.current.getContext("2d");
         if (ctx) {
-          imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-        }
-      }
-        if(!socket){
-        console.log("socket not found");
-        return;
-      }
-
-      const api = initDraw(canvasRef.current, socket,{
-        defaultTool: tool,
-        defaultColor: color,
-        defaultLineWidth: lineWidth,//socket
-      });
-      setDrawAPI(api);
-
-      // Apply current state to the new API instance immediately
-      if (api) {
-        api.setTool(tool);
-        api.setColor(color);
-        api.setLineWidth(lineWidth);
-        
-        // Restore canvas content if it existed
-        if (imageData && canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d');
-          if (ctx) {
-            // Clear and restore the previous drawing
-            setTimeout(() => {
-              ctx.putImageData(imageData!, 0, 0);
-            }, 0);
-          }
+          setTimeout(() => {
+            ctx.putImageData(imageData!, 0, 0);
+          }, 0);
         }
       }
     }
-  }, [size,color,lineWidth,tool,socket]);
+  }, [size, color, lineWidth, tool, socket]);
 
-  // Update tool when it changes
+  // Update tool/color/lineWidth when they change
   useEffect(() => {
-    if (drawAPI) {
-      drawAPI.setTool(tool);
-    }
+    if (drawAPI) drawAPI.setTool(tool);
   }, [drawAPI, tool]);
 
-  // Update color when it changes
   useEffect(() => {
-    if (drawAPI) {
-      drawAPI.setColor(color);
-    }
+    if (drawAPI) drawAPI.setColor(color);
   }, [drawAPI, color]);
 
-  // Update line width when it changes
   useEffect(() => {
-    if (drawAPI) {
-      drawAPI.setLineWidth(lineWidth);
-    }
+    if (drawAPI) drawAPI.setLineWidth(lineWidth);
   }, [drawAPI, lineWidth]);
 
   const handleToolChange = useCallback((newTool: Tool) => {
@@ -135,13 +140,19 @@ function Canvas() {
     setTool(newTool);
   }, []);
 
-  const handleColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setColor(e.target.value);
-  }, []);
+  const handleColorChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setColor(e.target.value);
+    },
+    []
+  );
 
-  const handleLineWidthChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setLineWidth(parseInt(e.target.value));
-  }, []);
+  const handleLineWidthChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setLineWidth(parseInt(e.target.value));
+    },
+    []
+  );
 
   const handleClear = useCallback(() => {
     if (drawAPI) {
@@ -152,67 +163,120 @@ function Canvas() {
   return (
     <div className="flex flex-col items-center z-50">
       <div className="flex gap-2 mb-4 z-50">
-        <button 
-          className={`p-2 m-2 border-2 rounded-2xl ${tool === "pen" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+        {/* Tool buttons */}
+        <button
+          className={`p-2 m-2 border-2 rounded-2xl ${
+            tool === "pen"
+              ? "bg-[#a78bfa] border-[#a78bfa]"
+              : "bg-[#1f1f1f] border-gray-600"
+          }`}
           onClick={() => handleToolChange("pen")}
         >
-          <Pencil className={`${tool === "pen" ? "text-white" : "text-[#a78bfa]"}`} />
+          <Pencil
+            className={`${tool === "pen" ? "text-white" : "text-[#a78bfa]"}`}
+          />
         </button>
-        
-        <button 
-          className={`p-2 m-2 border-2 rounded-2xl ${tool === "rect" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+
+        <button
+          className={`p-2 m-2 border-2 rounded-2xl ${
+            tool === "rect"
+              ? "bg-[#a78bfa] border-[#a78bfa]"
+              : "bg-[#1f1f1f] border-gray-600"
+          }`}
           onClick={() => handleToolChange("rect")}
         >
-          <RectangleHorizontal className={`${tool === "rect" ? "text-white" : "text-[#a78bfa]"}`} />
+          <RectangleHorizontal
+            className={`${
+              tool === "rect" ? "text-white" : "text-[#a78bfa]"
+            }`}
+          />
         </button>
-        
-        <button 
-          className={`p-2 m-2 border-2 rounded-2xl ${tool === "circle" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+
+        <button
+          className={`p-2 m-2 border-2 rounded-2xl ${
+            tool === "circle"
+              ? "bg-[#a78bfa] border-[#a78bfa]"
+              : "bg-[#1f1f1f] border-gray-600"
+          }`}
           onClick={() => handleToolChange("circle")}
         >
-          <Circle className={`${tool === "circle" ? "text-white" : "text-[#a78bfa]"}`} />
+          <Circle
+            className={`${tool === "circle" ? "text-white" : "text-[#a78bfa]"}`}
+          />
         </button>
-        {/*  */}
-        <button 
-          className={`p-2 m-2 border-2 rounded-2xl ${tool === "triangle" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+
+        <button
+          className={`p-2 m-2 border-2 rounded-2xl ${
+            tool === "triangle"
+              ? "bg-[#a78bfa] border-[#a78bfa]"
+              : "bg-[#1f1f1f] border-gray-600"
+          }`}
           onClick={() => handleToolChange("triangle")}
         >
-          <Triangle className={`${tool === "triangle" ? "text-white" : "text-[#a78bfa]"}`} />
+          <Triangle
+            className={`${
+              tool === "triangle" ? "text-white" : "text-[#a78bfa]"
+            }`}
+          />
         </button>
-        <button 
-          className={`p-2 m-2 border-2 rounded-2xl ${tool === "arrow" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+
+        <button
+          className={`p-2 m-2 border-2 rounded-2xl ${
+            tool === "arrow"
+              ? "bg-[#a78bfa] border-[#a78bfa]"
+              : "bg-[#1f1f1f] border-gray-600"
+          }`}
           onClick={() => handleToolChange("arrow")}
         >
-          <ArrowBigRight className={`${tool === "arrow" ? "text-white" : "text-[#a78bfa]"}`} />
+          <ArrowBigRight
+            className={`${tool === "arrow" ? "text-white" : "text-[#a78bfa]"}`}
+          />
         </button>
-        <button 
-          className={`p-2 m-2 border-2 rounded-2xl ${tool === "dottedArrow" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+
+        <button
+          className={`p-2 m-2 border-2 rounded-2xl ${
+            tool === "dottedArrow"
+              ? "bg-[#a78bfa] border-[#a78bfa]"
+              : "bg-[#1f1f1f] border-gray-600"
+          }`}
           onClick={() => handleToolChange("dottedArrow")}
         >
-          <ArrowBigRightDash  className={`${tool === "dottedArrow" ? "text-white" : "text-[#a78bfa]"}`} />
+          <ArrowBigRightDash
+            className={`${
+              tool === "dottedArrow" ? "text-white" : "text-[#a78bfa]"
+            }`}
+          />
         </button>
-        {/*  */}
-        <button 
-          className={`p-2 m-2 border-2 rounded-2xl ${tool === "eraser" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+
+        <button
+          className={`p-2 m-2 border-2 rounded-2xl ${
+            tool === "eraser"
+              ? "bg-[#a78bfa] border-[#a78bfa]"
+              : "bg-[#1f1f1f] border-gray-600"
+          }`}
           onClick={() => handleToolChange("eraser")}
         >
-          <Eraser className={`${tool === "eraser" ? "text-white" : "text-[#a78bfa]"}`} />
+          <Eraser
+            className={`${
+              tool === "eraser" ? "text-white" : "text-[#a78bfa]"
+            }`}
+          />
         </button>
-        
-        <button 
-          className="bg-[#1f1f1f] p-2 m-2 border-2 border-gray-600 rounded-2xl hover:bg-red-900" 
+
+        <button
+          className="bg-[#1f1f1f] p-2 m-2 border-2 border-gray-600 rounded-2xl hover:bg-red-900"
           onClick={handleClear}
         >
           <Trash className="text-[#a78bfa]" />
         </button>
-        
+
         <input
           className="mt-3"
           type="color"
           value={color}
           onChange={handleColorChange}
         />
-        
+
         <input
           type="range"
           min="1"
@@ -222,7 +286,7 @@ function Canvas() {
           className="mt-4"
         />
       </div>
-      
+
       <canvas
         ref={canvasRef}
         width={size.width}

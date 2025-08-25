@@ -22,6 +22,7 @@ export interface DrawAPI {
 export function initDraw(
   canvas: HTMLCanvasElement,
   socket: WebSocket,
+  roomId:number,
   options: {
     defaultTool?: Tool;
     defaultColor?: string;
@@ -143,12 +144,13 @@ export function initDraw(
       // ✅ Broadcast the shape to other clients
       console.log("shape in the mouseup",shape);
       console.log(JSON.stringify({
-        type:"shape",
+        type:"chat",
         message:shape
       }));
+
+      console.log("socket is real",socket);
+      socket.send(JSON.stringify({ type: "chat", message: shape,roomId}));
       
-      const res=socket.send(JSON.stringify({ type: "shape", message: shape }));
-      console.log("res in the init ",res);
 
     }
 
@@ -166,7 +168,7 @@ export function initDraw(
   // ✅ Listen for shapes from other clients
   socket.onmessage = (event) => {
     try {
-        console.log(event.data);
+        console.log("the event data is in mouseleave",event.data);
       const data = JSON.parse(event.data);
       console.log("the data in chat",data);
       if (data.type === "chat") {
