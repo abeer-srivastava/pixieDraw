@@ -1,10 +1,10 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawAPI, initDraw, sendShapes } from "../../draw";
-import { Circle, Eraser, Pencil, RectangleHorizontal, Trash } from "lucide-react";
+import { ArrowBigRight, ArrowBigRightDash, Circle, Eraser, Pencil, RectangleHorizontal, Trash, Triangle } from "lucide-react";
 import { useParams } from "next/navigation";
 
-type Tool = "pen" | "rect" | "circle" | "eraser";
+type Tool = "" | "pen" | "rect" | "circle" | "eraser" | "arrow" | "dottedArrow" | "triangle";
 
 function Canvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -146,7 +146,26 @@ function Canvas() {
         >
           <Circle className={`${tool === "circle" ? "text-white" : "text-[#a78bfa]"}`} />
         </button>
-        
+        {/*  */}
+        <button 
+          className={`p-2 m-2 border-2 rounded-2xl ${tool === "triangle" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+          onClick={() => handleToolChange("triangle")}
+        >
+          <Triangle className={`${tool === "triangle" ? "text-white" : "text-[#a78bfa]"}`} />
+        </button>
+        <button 
+          className={`p-2 m-2 border-2 rounded-2xl ${tool === "arrow" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+          onClick={() => handleToolChange("arrow")}
+        >
+          <ArrowBigRight className={`${tool === "arrow" ? "text-white" : "text-[#a78bfa]"}`} />
+        </button>
+        <button 
+          className={`p-2 m-2 border-2 rounded-2xl ${tool === "dottedArrow" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
+          onClick={() => handleToolChange("dottedArrow")}
+        >
+          <ArrowBigRightDash  className={`${tool === "dottedArrow" ? "text-white" : "text-[#a78bfa]"}`} />
+        </button>
+        {/*  */}
         <button 
           className={`p-2 m-2 border-2 rounded-2xl ${tool === "eraser" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"}`}
           onClick={() => handleToolChange("eraser")}

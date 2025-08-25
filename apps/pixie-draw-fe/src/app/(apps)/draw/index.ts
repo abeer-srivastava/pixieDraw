@@ -1,10 +1,12 @@
 import axios from "axios";
 import { HTTP_BACKEND } from "../../../../config";
 
-type Tool = "" | "pen" | "rect" | "circle" | "eraser";
+type Tool = "" | "pen" | "rect" | "circle" | "eraser" | "arrow" | "dottedArrow" | "triangle";
+
 type Shape =
   | { type: "pen" | "eraser"; points: { x: number; y: number }[]; color: string; lineWidth: number }
-  | { type: "rect" | "circle"; startX: number; startY: number; endX: number; endY: number; color: string; lineWidth: number };
+  | { type: "rect" | "circle" | "arrow" | "dottedArrow" | "triangle"; startX: number; startY: number; endX: number; endY: number; color: string; lineWidth: number };
+
 const shapes: Shape[] = [];
 let currentStroke: { x: number; y: number }[] = [];
 export interface DrawAPI {
@@ -34,7 +36,7 @@ export function initDraw(
   let startX = 0;
   let startY = 0;
   let tool: Tool = options.defaultTool || "pen";
-  let strokeColor = options.defaultColor || "#a78bfa"; // purple
+  let strokeColor = options.defaultColor || "#a78bfa";  
   let lineWidth = options.defaultLineWidth || 2;
 
   const setTool = (newTool: Tool) => {
@@ -44,21 +46,21 @@ export function initDraw(
   const setColor = (color: string) => (strokeColor = color);
   const setLineWidth = (w: number) => (lineWidth = w);
 
-  // Store original image before drawing shape
+  // Storing the  original image before drawing shape
   let savedImage: ImageData | null = null
 
-  // Event handlers
+ 
   const handleMouseDown = (e: MouseEvent) => {
-    // Don't draw if no tool is selected
     if (!tool) return;
 
     drawing = true;
     startX = e.offsetX;
     startY = e.offsetY;
 
-    if (tool === "rect" || tool === "circle") {
-      savedImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    if (tool === "rect" || tool === "circle" || tool === "arrow" || tool === "dottedArrow" || tool === "triangle") {
+        savedImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
     }
+
 
     if (tool === "pen" || tool === "eraser") {
       ctx.beginPath();
@@ -73,7 +75,6 @@ export function initDraw(
     const x = e.offsetX;
     const y = e.offsetY;
 
-    // Set drawing properties
     ctx.lineWidth = lineWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -98,8 +99,6 @@ export function initDraw(
       if (savedImage) {
         ctx.putImageData(savedImage, 0, 0);
       }
-
-      // Reset composite operation for shapes
       ctx.globalCompositeOperation = "source-over";
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = lineWidth;
@@ -115,8 +114,48 @@ export function initDraw(
         );
         ctx.arc(startX, startY, radius, 0, Math.PI * 2);
         ctx.stroke();
-      }
-    }
+      }      
+    }else if (tool === "arrow" || tool === "dottedArrow" || tool === "triangle") {
+        // Restore the saved image and redraw the shape
+        if (savedImage) {
+            ctx.putImageData(savedImage, 0, 0);
+        }
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+    if (tool === "arrow" || tool === "dottedArrow") {
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(x, y);
+
+    if (tool === "dottedArrow") ctx.setLineDash([5, 5]);
+            else ctx.setLineDash([]);
+
+            ctx.stroke();
+
+            const angle = Math.atan2(y - startY, x - startX);
+            const headLen = 10;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - headLen * Math.cos(angle - Math.PI / 6), y - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - headLen * Math.cos(angle + Math.PI / 6), y - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.stroke();
+
+            ctx.setLineDash([]); // reset
+    } else if (tool === "triangle") {
+            ctx.beginPath();
+            ctx.moveTo(startX, y);
+            ctx.lineTo((startX + x) / 2, startY);
+            ctx.lineTo(x, y);
+            ctx.closePath();
+            ctx.stroke();
+        }
+        }
+
   };
 
   const handleMouseUp = (e:MouseEvent) => {
@@ -127,7 +166,7 @@ export function initDraw(
       color: strokeColor,
       lineWidth,
     });
-  } else if (tool === "rect" || tool === "circle") {
+  } else if (tool === "rect" || tool === "circle" || tool === "arrow" || tool === "dottedArrow" || tool === "triangle") {
     shapes.push({
       type: tool,
       startX,
@@ -138,20 +177,21 @@ export function initDraw(
       lineWidth,
     });
   }
+  
     drawing = false;
     ctx.closePath();
-    // Reset composite operation
+
     ctx.globalCompositeOperation = "source-over";
   };
 
   const handleMouseLeave = () => {
     drawing = false;
     ctx.closePath();
-    // Reset composite operation
+
     ctx.globalCompositeOperation = "source-over";
   };
 
-  // Add event listeners
+
   canvas.addEventListener("mousedown", handleMouseDown);
   canvas.addEventListener("mousemove", handleMouseMove);
   canvas.addEventListener("mouseup", handleMouseUp);
@@ -167,7 +207,7 @@ export function initDraw(
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     },
     destroy: () => {
-      // Cleanup event listeners
+  
       canvas.removeEventListener("mousedown", handleMouseDown);
       canvas.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("mouseup", handleMouseUp);
@@ -192,10 +232,11 @@ export async function sendShapes(api: DrawAPI | null, roomId: string) {
   const shapes = api.getShapes();
   if (!shapes.length) return;
 
-  await axios.get(`http://localhost:8080/api/v1/chats/${roomId}`, {
-    message: JSON.stringify({
-      type: "shapes",
-      data: shapes,
-    }),
-  });
+  const res=await axios.get(`http://localhost:8080/api/v1/chats/${roomId}`);
+  const messages=res.data.messages
+  const shapesGet=messages.map((x:{message:string})=>{
+    const messageData=(x.message);
+    return messageData
+  })
+  return shapesGet;
 }
