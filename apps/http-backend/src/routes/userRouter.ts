@@ -25,9 +25,10 @@ router.get("/",(req,res)=>{
 router.post("/signup",async (req,res)=>{
    try {
      const body=req.body;
+    
      const parsedData=CreateUserSchema.safeParse(body);
      if(!parsedData.success){
-        console.log(parsedData.error);
+        console.log("parsed error in signup",parsedData.error);
         return res.status(403).json({
              message:"Incorrect Inputs"
         });
@@ -102,6 +103,7 @@ router.post("/signin",async(req,res)=>{
 router.post("/room",authMiddleware,async (req,res)=>{
 try {
         const parsedData=roomSchema.safeParse(req.body);
+        // console.log("parsed data in the room is",parsedData)
         if(!parsedData.success){
             console.log("error occured in room creation",parsedData.error);
             return res.status(403).json({
@@ -110,6 +112,7 @@ try {
         }
 
         const userId=req.userId;
+        // console.log("the user id is ",userId);
         if(!userId){
             return res.status(404).json({
                 message:"User not Authenticated"
@@ -122,6 +125,7 @@ try {
                 adminId:userId
             }
         });
+        // console.log(room);
         return res.status(201).json({
             message:"Room created",
             id:room.id
@@ -156,9 +160,9 @@ router.get("/chats/:roomId",async (req,res)=>{
     }
 });
 
-router.get("/room/:slug",async (req,res)=>{
+router.get("/room/:slug",authMiddleware,async (req,res)=>{
     const slug=req.params.slug;
-    const room=prisma.room.findFirst({
+    const room=await prisma.room.findFirst({
         where:{
             slug
         }
@@ -168,9 +172,10 @@ router.get("/room/:slug",async (req,res)=>{
             message:"Slug not found"
         });
     }
+    // console.log(room);
+
     return res.status(201).json({
-        message:"slug found",
-        room
+        roomId:room.id
     });
 })
 

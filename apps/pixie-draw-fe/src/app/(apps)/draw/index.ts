@@ -31,7 +31,7 @@ export function initDraw(
 ): DrawAPI | null {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-    console.log("socket in the INIT ",socket)
+    // console.log("socket in the INIT ",socket)
   ctx.fillStyle = "rgba(0,0,0,0)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -142,13 +142,13 @@ export function initDraw(
     if (shape) {
       shapes.push(shape);
       // ✅ Broadcast the shape to other clients
-      console.log("shape in the mouseup",shape);
+      // console.log("shape in the mouseup",shape);
       console.log(JSON.stringify({
         type:"chat",
         message:shape
       }));
 
-      console.log("socket is real",socket);
+    //   console.log("socket is real",socket);
       socket.send(JSON.stringify({ type: "chat", message: shape,roomId}));
       
 
@@ -168,12 +168,12 @@ export function initDraw(
   // ✅ Listen for shapes from other clients
   socket.onmessage = (event) => {
     try {
-        console.log("the event data is in mouseleave",event.data);
+        // console.log("the event data is in mouseleave",event.data);
       const data = JSON.parse(event.data);
-      console.log("the data in chat",data);
+      // console.log("the data in chat",data);
       if (data.type === "chat") {
         const shape: Shape = data.message;
-        console.log("shapes in the chat",shape)
+        // console.log("shapes in the chat",shape)
         shapes.push(shape);
         redrawAllShapes(ctx);
       }

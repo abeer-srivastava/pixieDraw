@@ -49,17 +49,17 @@ wss.on("connection",function connection(ws,request){
     })
 
     ws.on("message",async function message(data){
-        console.log("control reacted here mf",data);
-        console.log("type of data",typeof data);
+        // console.log("control reacted here mf",data);
+        // console.log("type of data",typeof data);
         let parsedData;
         if(typeof data!=="string"){
-            console.log("parsed data is not string ig");
+            // console.log("parsed data is not string ig");
             parsedData=JSON.parse(data.toString());
         }else{
-            console.log("parsed Data is string ig");
+            // console.log("parsed Data is string ig");
             parsedData=JSON.parse(data);
         }
-        console.log("proper parsed data is ",parsedData);
+        // console.log("proper parsed data is ",parsedData);
 
         if(parsedData.type==="join_room"){
             const user=users.find(x=>x.ws===ws)

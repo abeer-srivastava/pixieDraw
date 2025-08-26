@@ -40,7 +40,7 @@ function Canvas() {
         roomId,
       });
       ws.send(data);
-      console.log("sendingdata",data);
+      // console.log("sendingdata",data);
       setSocket(ws);
 
     };
@@ -92,7 +92,7 @@ function Canvas() {
       }
     }
 
-    console.log("socket in 2nd useEffect", socket);
+    // console.log("socket in 2nd useEffect", socket);
     if (!socket) {
       console.log("socket not found");
       return;
@@ -120,7 +120,7 @@ function Canvas() {
         }
       }
     }
-  }, [size, color, lineWidth, tool, socket]);
+  }, [size, color, lineWidth, tool, socket]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update tool/color/lineWidth when they change
   useEffect(() => {

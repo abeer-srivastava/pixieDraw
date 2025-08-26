@@ -6,6 +6,8 @@ import { Input } from "../components/ui/input"
 import axios from "axios"
 import Link from "next/link"
 import { Feather } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 
 
@@ -23,7 +25,7 @@ export default function AuthPage({ isSignIn }: AuthPageProps) {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
+  const router=useRouter();
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
@@ -32,26 +34,30 @@ export default function AuthPage({ isSignIn }: AuthPageProps) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-
     try {
       if(isSignIn){
       const res = await axios.post("http://localhost:8080/api/v1/signin",formData);
+
       if (!res.status) {
         console.log("Error occured during signin");
         throw new Error("Error Occured during Signin")
+
       }
       const data = await res.data.token
       localStorage.setItem("token",data);
-      console.log("✅ Auth success:", data)
+      // console.log("✅ Auth success:", data)
+      router.replace("/room");
       }
       else{
         const res = await axios.post("http://localhost:8080/api/v1/signup",formData);
+        
          if (!res.status) {
-       console.log("Error occured during signup");
-        throw new Error("Error Occured during Signin");
+          console.log("Error occured during signup");
+          throw new Error("Error Occured during Signin");
       }
-      const data = await res.data.token
-      console.log("✅ Auth success:", data.token)
+        router.replace("/signin"); 
+      // const data = await res.data.token
+      // console.log("✅ Auth success:", data.token)
       }
 
     } catch (error: unknown) {
