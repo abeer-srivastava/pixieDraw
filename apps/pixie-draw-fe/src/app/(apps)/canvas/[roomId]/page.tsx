@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawAPI, initDraw } from "../../draw";
 import { 
   ArrowBigRight, ArrowBigRightDash, Circle, Eraser, 
-  Pencil, RectangleHorizontal, Trash, Triangle 
+  Pencil, RectangleHorizontal, Trash, Triangle,Type, Image as ImageIcon
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { WS_URL } from "../../../../../config";
 
-type Tool = "" | "pen" | "rect" | "circle" | "eraser" | "arrow" | "dottedArrow" | "triangle";
+type Tool = "" | "pen" | "rect" | "circle" | "eraser" | "arrow" | "dottedArrow" | "triangle" | "text"
+  | "image";
+
 
 function Canvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -164,6 +166,24 @@ function Canvas() {
     <div className="flex flex-col items-center z-50">
       <div className="flex gap-2 mb-4 z-50">
         {/* Tool buttons */}
+
+      <button
+        className={`p-2 m-2 border-2 rounded-2xl ${
+          tool === "text" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"
+        }`}
+        onClick={() => handleToolChange("text")}
+      >
+        <Type className={`${tool === "text" ? "text-white" : "text-[#a78bfa]"}`} />
+      </button>
+
+      <button
+        className={`p-2 m-2 border-2 rounded-2xl ${
+          tool === "image" ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-[#1f1f1f] border-gray-600"
+        }`}
+        onClick={() => handleToolChange("image")}
+      >
+        <ImageIcon className={`${tool === "image" ? "text-white" : "text-[#a78bfa]"}`} />
+      </button>
         <button
           className={`p-2 m-2 border-2 rounded-2xl ${
             tool === "pen"

@@ -1,11 +1,16 @@
 import axios from "axios";
 import { HTTP_BACKEND } from "../../../../config";
 
-type Tool = "" | "pen" | "rect" | "circle" | "eraser" | "arrow" | "dottedArrow" | "triangle";
+type Tool = "" | "pen" | "rect" | "circle" | "eraser" | "arrow" | "dottedArrow" | "triangle" | "text"
+  | "image";
 
 type Shape =
   | { type: "pen" | "eraser"; points: { x: number; y: number }[]; color: string; lineWidth: number }
-  | { type: "rect" | "circle" | "arrow" | "dottedArrow" | "triangle"; startX: number; startY: number; endX: number; endY: number; color: string; lineWidth: number };
+  | { type: "rect" | "circle" | "arrow" | "dottedArrow" | "triangle"; startX: number; startY: number; endX: number; endY: number; color: string; lineWidth: number }
+  | { type: "text"; x: number; y: number; text: string; color: string; fontSize: number }
+  | { type: "image"; x: number; y: number; src: string; width: number; height: number };
+
+;
 
 const shapes: Shape[] = [];
 let currentStroke: { x: number; y: number }[] = [];
@@ -53,6 +58,63 @@ export function initDraw(
     drawing = true;
     startX = e.offsetX;
     startY = e.offsetY;
+
+  if (tool === "text") {
+    const userText = prompt("Enter text:");
+    if (userText) {
+      ctx.font = `${16 + lineWidth * 1.5}px Arial`;
+      ctx.fillStyle = strokeColor;
+      ctx.fillText(userText, startX, startY);
+
+      const shape: Extract<Shape, { type: "text" }> = {
+        type: "text",
+        x: startX,
+        y: startY,
+        text: userText,
+        color: strokeColor,
+        fontSize: 16 + lineWidth * 1.5,
+      };
+      shapes.push(shape);
+      socket.send(JSON.stringify({ type: "chat", message: shape, roomId }));
+    }
+    return;
+  }
+
+  if (tool === "image") {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.onchange = async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const img = new Image();
+        img.src = ev.target?.result as string;
+
+        img.onload = () => {
+          const width = 150;
+          const height = (img.height / img.width) * 150;
+          ctx.drawImage(img, startX, startY, width, height);
+
+          const shape: Extract<Shape, { type: "image" }> = {
+            type: "image",
+            x: startX,
+            y: startY,
+            src: img.src,
+            width,
+            height,
+          };
+          shapes.push(shape);
+          socket.send(JSON.stringify({ type: "chat", message: shape, roomId }));
+        };
+      };
+      reader.readAsDataURL(file);
+    };
+    fileInput.click();
+    return;
+  }
 
     if (tool !== "pen" && tool !== "eraser") {
       savedImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -127,7 +189,14 @@ export function initDraw(
 
     if (tool === "pen" || tool === "eraser") {
       shape = { type: tool, points: currentStroke, color: strokeColor, lineWidth };
-    } else if (tool) {
+    } else if (
+      tool === "rect" ||
+      tool === "circle" ||
+      tool === "arrow" ||
+      tool === "dottedArrow" ||
+      tool === "triangle"
+    ) {
+      // Narrowed to the shape kinds that use start/end coordinates
       shape = {
         type: tool,
         startX,
@@ -189,8 +258,23 @@ export function initDraw(
 
     shapes.forEach((s) => {
       ctx.beginPath();
-      ctx.lineWidth = s.lineWidth;
-      ctx.strokeStyle = s.color;
+
+      // Safely set lineWidth when present on the shape
+      if ("lineWidth" in s && typeof s.lineWidth === "number") {
+        ctx.lineWidth = s.lineWidth;
+      } else {
+        ctx.lineWidth = 2;
+      }
+
+      // Safely set strokeStyle/fillStyle when the shape has a color
+      if ("color" in s && typeof s.color === "string") {
+        ctx.strokeStyle = s.color;
+        ctx.fillStyle = s.color;
+      } else {
+        ctx.strokeStyle = "#000";
+        ctx.fillStyle = "#000";
+      }
+
       ctx.setLineDash([]);
 
       if (s.type === "pen" || s.type === "eraser") {
@@ -211,7 +295,7 @@ export function initDraw(
         ctx.lineTo(s.endX, s.endY);
         if (s.type === "dottedArrow") ctx.setLineDash([5, 5]);
         ctx.stroke();
-
+        
         const angle = Math.atan2(s.endY - s.startY, s.endX - s.startX);
         const headLen = 10;
         ctx.beginPath();
@@ -226,7 +310,20 @@ export function initDraw(
         ctx.lineTo(s.endX, s.endY);
         ctx.closePath();
         ctx.stroke();
-      }
+      } else if (s.type === "text") {
+        ctx.save(); // isolate state
+        ctx.font = `${s.fontSize}px Arial`;
+        ctx.fillStyle = s.color;
+        ctx.textBaseline = "top";
+        ctx.fillText(s.text, s.x, s.y);
+        ctx.restore();
+      } else if (s.type === "image") {
+        const img = new Image();
+        img.src = s.src;
+        img.onload = () => {
+    ctx.drawImage(img, s.x, s.y, s.width, s.height);
+  };
+}
     });
 
     ctx.globalCompositeOperation = "source-over";
@@ -236,6 +333,23 @@ export function initDraw(
   canvas.addEventListener("mousemove", handleMouseMove);
   canvas.addEventListener("mouseup", handleMouseUp);
   canvas.addEventListener("mouseleave", handleMouseLeave);
+
+  // Call this during initDraw (before any drawing) and on resize
+  function resizeCanvasForDPR(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // scale drawing operations to CSS pixels
+  }
+
+  resizeCanvasForDPR(canvas, ctx);
+  window.addEventListener("resize", () => {
+    resizeCanvasForDPR(canvas, ctx);
+    redrawAllShapes(ctx); // redraw after resizing
+  });
 
   return {
     setTool,
